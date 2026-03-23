@@ -177,9 +177,11 @@ def make_dataset_signal(
     x, y = [], []
     print("Generating samples...")
     for fc in cutoffs:
-        sweep = exponential_sweep(n_sweep, f1=f_low, f2=f_high, sample_rate=sample_rate)
+        sweep = exponential_sweep(
+            total_samples, f1=f_low, f2=f_high, sample_rate=sample_rate
+        )
         noise = bandlimited_white_noise(
-            n_noise, sample_rate, f_low=f_low, f_high=f_high, amplitude_ramp=True
+            total_samples, sample_rate, f_low=f_low, f_high=f_high, amplitude_ramp=True
         )
         b, a = make_lowpass_coeffs(fc, sample_rate)
         y.append(sp_signal.lfilter(b, a, sweep).astype(np.float32))
