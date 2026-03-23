@@ -31,11 +31,13 @@ class AudioFilterDataset(Dataset):
             targets.append(tgt)
 
         # Stack into (n_sequences, n_buffers, buffer_size, 2/1)
-        self.inputs = torch.tensor(np.stack(inputs), dtype=torch.float32)
-        self.targets = torch.tensor(np.stack(targets), dtype=torch.float32)
+        self.inputs = inputs
+        self.targets = targets
 
     def __len__(self):
         return len(self.inputs)
 
     def __getitem__(self, idx):
-        return self.inputs[idx], self.targets[idx]
+        x = torch.tensor(self.inputs[idx], dtype=torch.float32)
+        y = torch.tensor(self.targets[idx], dtype=torch.float32)
+        return x, y
