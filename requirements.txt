@@ -1,5 +1,4 @@
 asttokens
-audioop
 audioread
 certifi
 cffi
@@ -57,19 +56,13 @@ pure_eval
 pycparser
 Pygments
 pyparsing
-python
 pyzmq
 requests
-scikit
 scipy
 setuptools
 six
 soundfile
 soxr
-stack
-standard
-standard
-standard
 sympy
 threadpoolctl
 torch
