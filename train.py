@@ -47,32 +47,9 @@ ds = dataset.AudioFilterDataset(inputs, outputs, args.buffer_size, args.sample_r
 
 dataloader = DataLoader(ds, batch_size=8, shuffle=True)
 
-gru = model.LowpassRNN(hidden_size=args.hidden_size, num_layers=args.num_layers)
-
-optimizer = Adam(gru.parameters(), lr=1e-3)
-# criterion = nn.MSELoss()
 checkpoint_folder = "checkpoints"
 
 run_id = 0
-
-
-def spectral_loss(pred, target, sample_rate=48000, low_freq_weight=5.0):
-    # Standard time-domain MSE
-    mse = nn.functional.mse_loss(pred, target)
-
-    # Frequency-domain loss with low-freq emphasis
-    pred_f = fft.rfft(pred.squeeze(-1), dim=-1)
-    tgt_f = fft.rfft(target.squeeze(-1), dim=-1)
-
-    n = pred.shape[-2]  # buffer_size
-    freqs = fft.rfftfreq(n, d=1.0 / sample_rate).to(pred.device)
-
-    weights = 1.0 / (freqs + 50.0)  # 50 Hz offset to avoid division by zero
-    weights = weights / weights.mean()  # normalize so overall loss scale is stable
-
-    freq_loss = (weights * (pred_f - tgt_f).abs()).mean()
-    return mse + 0.1 * freq_loss
-
 
 while True:
     try:
@@ -87,6 +64,23 @@ while True:
 
 best_loss = float("inf")
 
+import torch
+
+device = None
+cuda_available = torch.cuda.is_available()
+if cuda_available:
+    device = torch.device("cuda")
+    torch.cuda.empty_cache()
+else:
+    device = torch.device("cpu")
+
+gru = model.LowpassRNN(hidden_size=args.hidden_size, num_layers=args.num_layers).to(
+    device
+)
+
+optimizer = Adam(gru.parameters(), lr=1e-3)
+criterion = nn.MSELoss()
+
 for epoch in range(args.epochs):
     epoch_loss = 0.0
 
@@ -96,13 +90,11 @@ for epoch in range(args.epochs):
         total_loss = tensor(0.0)
 
         for t in range(batch_inputs.shape[1]):
-            x = batch_inputs[:, t, :, :]
-            y = batch_targets[:, t, :, :]
+            x = batch_inputs[:, t, :, :].to(device)
+            y = batch_targets[:, t, :, :].to(device)
             output, hidden = gru(x, hidden)
             # hidden = hidden.detach()
-            total_loss = total_loss + spectral_loss(
-                output, y, sample_rate=args.sample_rate
-            )
+            total_loss = total_loss + criterion(output, y)
 
         total_loss.backward()
         optimizer.step()
@@ -129,6 +121,8 @@ for epoch in range(args.epochs):
         best_loss = avg_loss
         save(checkpoint, os.path.join(checkpoint_folder, "best.pt"))
         print(f"   ↳ New best model saved (loss: {best_loss:.6f})")
+    if cuda_available:
+        torch.cuda.empty_cache()
 
 save(gru.state_dict(), os.path.join(checkpoint_folder, "lowpass_rnn.pt"))
 print("Final model saved to " + os.path.join(checkpoint_folder, "lowpass_rnn.pt"))
