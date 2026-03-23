@@ -46,12 +46,11 @@ def exponential_sweep(
     L = T / np.log(f2 / f1)
     t = np.arange(n_samples) / sample_rate
     sweep = np.sin(2 * np.pi * f1 * L * (np.exp(t / L) - 1))
-
     # Fade in/out to reduce spectral leakage
     fade = np.ones(n_samples)
     fade[:fade_samples] = np.linspace(0, 1, fade_samples)
     fade[-fade_samples:] = np.linspace(1, 0, fade_samples)
-    return t, (sweep * fade).astype(np.float32)
+    return (sweep * fade).astype(np.float32)
 
 
 def bandlimited_white_noise(
@@ -191,6 +190,7 @@ def make_dataset_signal(
         y.append(sp_signal.lfilter(b, a, noise).astype(np.float32))
         noise = np.append(noise, normalize_freq(fc, sample_rate))
         x.append(noise)
+
     print("Done generating samples")
 
     return x, y
