@@ -93,13 +93,13 @@ for epoch in range(args.epochs):
             x = batch_inputs[:, t, :, :].to(device)
             y = batch_targets[:, t, :, :].to(device)
             output, hidden = gru(x, hidden)
-            # hidden = hidden.detach()
+            hidden = hidden.detach()
             total_loss = total_loss + criterion(output, y)
 
         total_loss.backward()
         optimizer.step()
-
-        epoch_loss += total_loss.item()
+        batch_loss = total_loss.item()
+        epoch_loss += batch_loss
         print(
             f"Epoch {epoch+1}/{args.epochs} | Batch {batch_idx+1}/{len(dataloader)} | Loss: {total_loss.item():.6f}"
         )
