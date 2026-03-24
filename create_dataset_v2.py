@@ -249,7 +249,7 @@ if __name__ == "__main__":
     idx = 0
     print("Saving samples...")
     for x, y in zip(inputs, outputs):
-        np.save(os.path.join(xpath, f"input-{idx}.npy"), x)
-        np.save(os.path.join(ypath, f"expected-{idx}.npy"), y)
+        np.save(os.path.join(xpath, f"input-{idx}.npy"), x.astype(np.float32))
+        np.save(os.path.join(ypath, f"expected-{idx}.npy"), y.astype(np.float32))
         idx += 1
     print("Samples saved to {}".format(sample_folder))
