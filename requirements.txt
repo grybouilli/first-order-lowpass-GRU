@@ -2,7 +2,6 @@ asttokens
 audioread
 certifi
 cffi
-charset
 colorednoise
 comm
 contourpy

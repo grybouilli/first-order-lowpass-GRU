@@ -11,12 +11,27 @@ from pathlib import Path
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--sample_rate", type=int, default=44100)
-parser.add_argument("--buffer_size", type=int, default=1024)
-parser.add_argument("--dataset", type=str, default="./dataset-0")
-parser.add_argument("--epochs", type=int, default=50)
-parser.add_argument("--hidden_size", type=int, default=16)
-parser.add_argument("--num_layers", type=int, default=1)
+parser.add_argument(
+    "--buffer_size",
+    type=int,
+    default=1024,
+    help="Amount of samples passed as input to the GRU model during forward pass",
+)
+parser.add_argument(
+    "--dataset",
+    type=str,
+    default="./dataset-0",
+    help="Folder which should contain two subfolders ./inputs and ./expected, that represent the training dataset generated with create_dataset_v2.py",
+)
+parser.add_argument(
+    "--epochs", type=int, default=50, help="The amount of epoch for training"
+)
+parser.add_argument(
+    "--hidden_size", type=int, default=64, help="The hidden size of the GRU"
+)
+parser.add_argument(
+    "--num_layers", type=int, default=2, help="The number of layers in the GRU"
+)
 
 args = parser.parse_args()
 sample_folder = args.dataset
@@ -43,7 +58,7 @@ print(f"Loaded {len(inputs)} sequences")
 print(f"Input sequence length:  {len(inputs[0])} samples")
 print(f"Output sequence length: {len(outputs[0])} samples")
 
-ds = dataset.AudioFilterDataset(inputs, outputs, args.buffer_size, args.sample_rate)
+ds = dataset.AudioFilterDataset(inputs, outputs, args.buffer_size)
 
 dataloader = DataLoader(ds, batch_size=8, shuffle=True)
 

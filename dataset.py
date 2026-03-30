@@ -5,11 +5,7 @@ import numpy as np
 
 class AudioFilterDataset(Dataset):
     def __init__(
-        self,
-        samples: list[np.ndarray],
-        filtered: list[np.ndarray],
-        buffer_size: int,
-        sample_rate: int,
+        self, samples: list[np.ndarray], filtered: list[np.ndarray], buffer_size: int
     ):
         self.buffer_size = buffer_size
         inputs, targets = [], []

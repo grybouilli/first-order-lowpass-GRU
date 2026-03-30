@@ -208,10 +208,27 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--sample_rate", type=int, default=44100)
-    parser.add_argument("--buffer_size", type=int, default=1024)
-    parser.add_argument("--amount_of_fc", type=int, default=200)
-    parser.add_argument("--max_buffer_amount", type=int, default=-1)
+    parser.add_argument(
+        "--sample_rate", type=int, default=44100, help="Generated signal sample-rate"
+    )
+    parser.add_argument(
+        "--buffer_size",
+        type=int,
+        default=1024,
+        help="Generated signal will have buffer_size * max_buffer_amount samples",
+    )
+    parser.add_argument(
+        "--amount_of_fc",
+        type=int,
+        default=200,
+        help="Expected signals will be filtered with frequencies ranging from 50 to 7500 Hz on a logarithmic scale. This option gives the amount of cut-off frequencies to use.",
+    )
+    parser.add_argument(
+        "--max_buffer_amount",
+        type=int,
+        default=-1,
+        help="Generated signal will have buffer_size * max_buffer_amount samples",
+    )
 
     args = parser.parse_args()
 
