@@ -63,9 +63,9 @@ int main(int argc, char ** argv)
     std::string input_filename {"../dataset-8/inputs/input-599.npy"};
     std::string output_filename {"output-599.npy"};
     std::string model_name {"../lowpass_rnn.onnx"};
-    if(argc == 0)
+    if(argc == 1)
     {
-        printf("usage : onnx_inference_test <path_to_onnx_model> <path_to_npy_input> <path_to_npy_output>");
+        printf("usage : onnx_inference_test <path_to_onnx_model> <path_to_npy_input> <path_to_npy_output>\n");
         return 0;
     }
     if(argc > 1)
@@ -87,7 +87,7 @@ int main(int argc, char ** argv)
     std::vector input_float = py_input.data;
     auto fc_normed = input_float.back();
     input_float.pop_back();
-    printf(std::format("fc normed = {}\n", fc_normed).c_str());
+    printf("fc normed = %f\n", fc_normed);
 
     // load onnx model
     /// session setup
@@ -96,7 +96,7 @@ int main(int argc, char ** argv)
     session_options.SetIntraOpNumThreads(1);
     session_options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
 
-    Ort::Session session(env, "../lowpass_rnn_v2.onnx", session_options);
+    Ort::Session session(env, model_name.c_str(), session_options);
     Ort::AllocatorWithDefaultOptions allocator;
 
     // prepare buffer of fc_norm
