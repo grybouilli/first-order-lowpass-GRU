@@ -151,7 +151,29 @@ def normalize_freq(freq: float, sample_rate: float) -> float:
     return -np.log2(2 * freq / sample_rate) / np.log2(1 / sample_rate)
 
 
+import scipy.signal as ss
+
+
+class Filters:
+    butter = "butter"
+    cheby1 = "cheby1"
+    algo = {
+        "butter": ss.butter,
+        "cheby1": ss.cheby1,
+    }
+    supported_algo = [butter, cheby1]
+
+    lowpass = "lowpass"
+    highpass = "highpass"
+    bandpass = "bandpass"
+
+    supported_types = [lowpass, highpass]
+
+
 def make_dataset_signal(
+    filter_algo: str,
+    filter_type: str,
+    filter_order: int,
     total_samples: int,
     sample_rate: float,
     f_low: float,
@@ -160,6 +182,7 @@ def make_dataset_signal(
     max_fc: float,
     amount_of_fc: int,
     sweep_fraction: float = 0.5,
+    cheby_ripple: float = 0.5,
 ) -> np.ndarray:
     """
     Concatenate an exponential sine sweep and bandlimited white noise.
@@ -169,6 +192,8 @@ def make_dataset_signal(
     - The sweep exercises all frequencies sequentially at fixed amplitude.
     - The noise exercises all frequencies simultaneously across all amplitudes.
     """
+    if filter_algo not in Filters.algo.keys():
+        raise Exception(f"Unknown filter algorithm: {filter_algo}")
     n_sweep = int(total_samples * sweep_fraction)
     n_noise = total_samples - n_sweep
 
@@ -182,7 +207,17 @@ def make_dataset_signal(
         noise = bandlimited_white_noise(
             total_samples, sample_rate, f_low=f_low, f_high=f_high, amplitude_ramp=True
         )
-        b, a = make_lowpass_coeffs(fc, sample_rate)
+        b, a = 0, 0
+        match filter_algo:
+            case Filters.butter:
+                b, a = Filters.algo[Filters.butter](
+                    filter_order, fc, btype=filter_type, fs=sample_rate
+                )
+            case Filters.cheby1:
+                b, a = Filters.algo[Filters.butter](
+                    filter_order, cheby_ripple, fc, btype=filter_type, fs=sample_rate
+                )
+
         y.append(sp_signal.lfilter(b, a, sweep).astype(np.float32))
         sweep = np.append(sweep, normalize_freq(fc, sample_rate))
         x.append(sweep)
@@ -202,7 +237,6 @@ def make_dataset_signal(
 
 if __name__ == "__main__":
     import argparse
-    import soundfile as sf
     import os
     from pathlib import Path
 
@@ -230,12 +264,45 @@ if __name__ == "__main__":
         help="Generated signal will have buffer_size * max_buffer_amount samples",
     )
 
+    parser.add_argument(
+        "--filter_algo",
+        type=str,
+        default="butter",
+        help=f"Filter's equation-based definition. Supported : {Filters.supported_algo}",
+        choices=Filters.supported_algo,
+    )
+
+    parser.add_argument(
+        "--filter_type",
+        type=str,
+        default="lowpass",
+        help=f"Filter's type. Supported : {Filters.supported_types}",
+        choices=Filters.supported_types,
+    )
+
+    parser.add_argument(
+        "--filter_order",
+        type=int,
+        default=1,
+        help="Filter's order",
+    )
+
+    parser.add_argument(
+        "--cheby_ripple",
+        type=float,
+        default=0.5,
+        help="Chebyshev passband or stopband ripple value ; is ignored if specified for a filter that is not cheby1 or cheby2",
+    )
+
     args = parser.parse_args()
 
     if args.max_buffer_amount < 0:
         args.max_buffer_amount = (args.sample_rate * 2) // args.buffer_size
 
     inputs, outputs = make_dataset_signal(
+        args.filter_algo,
+        args.filter_type,
+        args.filter_order,
         args.buffer_size * args.max_buffer_amount,
         args.sample_rate,
         f_low=20,
@@ -243,6 +310,7 @@ if __name__ == "__main__":
         min_fc=50,
         max_fc=7500,
         amount_of_fc=args.amount_of_fc,
+        cheby_ripple=args.cheby_ripple,
     )
 
     run_id = 0
