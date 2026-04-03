@@ -11,7 +11,8 @@ Dataset:      Exponential sine sweep + white noise, passed through a target
 
 import numpy as np
 from scipy import signal as sp_signal
-
+from random import uniform
+from joblib import Parallel, delayed
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1.  TARGET FILTER  (first-order IIR lowpass — the "ground truth" to learn)
@@ -183,6 +184,7 @@ def make_dataset_signal(
     amount_of_fc: int,
     sweep_fraction: float = 0.5,
     cheby_ripple: float = 0.5,
+    signal_per_fc: int = 6,
 ) -> np.ndarray:
     """
     Concatenate an exponential sine sweep and bandlimited white noise.
@@ -200,13 +202,8 @@ def make_dataset_signal(
     cutoffs = np.geomspace(min_fc, max_fc, amount_of_fc)
     x, y = [], []
     print("Generating samples...")
-    for fc in cutoffs:
-        sweep = exponential_sweep(
-            total_samples, f1=f_low, f2=f_high, sample_rate=sample_rate
-        )
-        noise = bandlimited_white_noise(
-            total_samples, sample_rate, f_low=f_low, f_high=f_high, amplitude_ramp=True
-        )
+
+    def generate_signals_for_fc(fc: float) -> None:
         b, a = 0, 0
         match filter_algo:
             case Filters.butter:
@@ -217,15 +214,30 @@ def make_dataset_signal(
                 b, a = Filters.algo[Filters.butter](
                     filter_order, cheby_ripple, fc, btype=filter_type, fs=sample_rate
                 )
+        # for fc in cutoffs:
+        for _ in range(signal_per_fc):
+            f_min = min(10, f_low + uniform(-5, 4))
+            f_max = max(sample_rate / 2, f_high + uniform(-15, 24))
+            sweep = exponential_sweep(
+                total_samples, f1=f_min, f2=f_max, sample_rate=sample_rate
+            )
+            noise = bandlimited_white_noise(
+                total_samples,
+                sample_rate,
+                f_low=f_low,
+                f_high=f_high,
+                amplitude_ramp=True,
+            )
 
-        y.append(sp_signal.lfilter(b, a, sweep).astype(np.float32))
-        sweep = np.append(sweep, normalize_freq(fc, sample_rate))
-        x.append(sweep)
+            y.append(sp_signal.lfilter(b, a, sweep).astype(np.float32))
+            sweep = np.append(sweep, normalize_freq(fc, sample_rate))
+            x.append(sweep)
 
-        y.append(sp_signal.lfilter(b, a, noise).astype(np.float32))
-        noise = np.append(noise, normalize_freq(fc, sample_rate))
-        x.append(noise)
+            y.append(sp_signal.lfilter(b, a, noise).astype(np.float32))
+            noise = np.append(noise, normalize_freq(fc, sample_rate))
+            x.append(noise)
 
+    Parallel(n_jobs=-1)(delayed(generate_signals_for_fc)(fc) for fc in cutoffs)
     print("Done generating samples")
 
     return x, y
@@ -292,6 +304,13 @@ if __name__ == "__main__":
         type=float,
         default=0.5,
         help="Chebyshev passband or stopband ripple value ; is ignored if specified for a filter that is not cheby1 or cheby2",
+    )
+
+    parser.add_argument(
+        "--signal_per_fc",
+        type=int,
+        default=6,
+        help="The amount of pair of sine-sweep and white noise generated per cut-off fc (prefer an even number)",
     )
 
     args = parser.parse_args()

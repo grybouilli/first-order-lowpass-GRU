@@ -8,6 +8,7 @@ from torch import Tensor, tensor, save, where, full_like, ones_like
 from torch.optim import Adam
 from torch import nn, fft
 from pathlib import Path
+from sklearn.model_selection import train_test_split
 
 parser = argparse.ArgumentParser()
 
@@ -31,6 +32,18 @@ parser.add_argument(
 )
 parser.add_argument(
     "--num_layers", type=int, default=2, help="The number of layers in the GRU"
+)
+parser.add_argument(
+    "--val_size",
+    type=float,
+    default=0.2,
+    help="The ratio of validation to training set (default is 0.2)",
+)
+parser.add_argument(
+    "--batch_size",
+    type=int,
+    default=8,
+    help="The batch size in dataset (default is 8)",
 )
 
 args = parser.parse_args()
@@ -58,9 +71,15 @@ print(f"Loaded {len(inputs)} sequences")
 print(f"Input sequence length:  {len(inputs[0])} samples")
 print(f"Output sequence length: {len(outputs[0])} samples")
 
-ds = dataset.AudioFilterDataset(inputs, outputs, args.buffer_size)
+train_inputs, val_inputs, train_outputs, val_outputs = train_test_split(
+    inputs, outputs, test_size=args.val_size, random_state=42
+)
 
-dataloader = DataLoader(ds, batch_size=8, shuffle=True)
+train_ds = dataset.AudioFilterDataset(train_inputs, train_outputs, args.buffer_size)
+val_ds = dataset.AudioFilterDataset(val_inputs, val_outputs, args.buffer_size)
+
+train_dataloader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True)
+val_dataloader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False)
 
 checkpoint_folder = "checkpoints"
 
@@ -98,42 +117,60 @@ criterion = nn.MSELoss()
 
 for epoch in range(args.epochs):
     epoch_loss = 0.0
-
-    for batch_idx, (batch_inputs, batch_targets) in enumerate(dataloader):
+    validation_loss = 0.0
+    # Training part
+    gru.train()
+    for batch_idx, (batch_inputs, batch_targets) in enumerate(train_dataloader):
         hidden = None
         optimizer.zero_grad()
-        total_loss = tensor(0.0)
+        batch_loss = tensor(0.0)
 
         for t in range(batch_inputs.shape[1]):
             x = batch_inputs[:, t, :, :].to(device)
             y = batch_targets[:, t, :, :].to(device)
             output, hidden = gru(x, hidden)
             hidden = hidden.detach()
-            total_loss = total_loss + criterion(output, y)
-
-        total_loss.backward()
+            batch_loss = batch_loss + criterion(output, y)
+        batch_loss /= batch_inputs.shape[1]
+        batch_loss.backward()
         optimizer.step()
-        batch_loss = total_loss.item()
-        epoch_loss += batch_loss
+        epoch_loss += batch_loss.item()
         print(
-            f"Epoch {epoch+1}/{args.epochs} | Batch {batch_idx+1}/{len(dataloader)} | Loss: {total_loss.item():.6f}"
+            f"Epoch {epoch+1}/{args.epochs} | Training Batch {batch_idx+1}/{len(train_dataloader)} | Training Batch Loss: {batch_loss.item():.6f}"
         )
 
-    avg_loss = epoch_loss / len(dataloader)
-    print(f"── Epoch {epoch+1} complete | Avg loss: {avg_loss:.6f}")
+    # Validation part
+    gru.eval()
+    with torch.no_grad():
+        for batch_idx, (batch_inputs, batch_targets) in enumerate(val_dataloader):
+            hidden = None
+            batch_loss = tensor(0.0)
 
+            for t in range(batch_inputs.shape[1]):
+                x = batch_inputs[:, t, :, :].to(device)
+                y = batch_targets[:, t, :, :].to(device)
+                output, hidden = gru(x, hidden)
+                hidden = hidden.detach()
+                batch_loss = batch_loss + criterion(output, y)
+            validation_loss += batch_loss.item() / batch_inputs.shape[1]
+
+    avg_train_loss = epoch_loss / len(train_dataloader)
+    avg_valid_loss = validation_loss / len(val_dataloader)
     # Save checkpoint every epoch
+    print(
+        f"── Epoch {epoch+1} complete | Avg train loss: {avg_train_loss:.6f} | Avg validation loss: {avg_valid_loss:.6f}"
+    )
     checkpoint = {
         "epoch": epoch + 1,
         "model_state_dict": gru.state_dict(),
         "optimizer_state_dict": optimizer.state_dict(),
-        "loss": avg_loss,
+        "loss": avg_train_loss,
     }
     save(checkpoint, os.path.join(checkpoint_folder, f"checkpoint_epoch{epoch+1}.pt"))
 
     # Save best model separately
-    if avg_loss < best_loss:
-        best_loss = avg_loss
+    if avg_valid_loss < best_loss:
+        best_loss = avg_valid_loss
         save(checkpoint, os.path.join(checkpoint_folder, "best.pt"))
         print(f"   ↳ New best model saved (loss: {best_loss:.6f})")
     if cuda_available:

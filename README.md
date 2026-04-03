@@ -199,8 +199,18 @@ options:
 
 <!-- ROADMAP -->
 ## Roadmap
+
+### General
 - [ ] Finish README.md
-- [ ] Implement Second-Order Lowpass 
+
+### Training
+- [X] Add validation loss in training
+- [ ] Implement other filters
+  - [ ] n-th order filters
+  - [ ] other types than lowpass
+  - [ ] other algo than butterworth
+  
+### Inference
 - [ ] Implement JUCE VST Plugin to use the model
 - [ ] Try other inference engines
     - [ ] RTNeural
