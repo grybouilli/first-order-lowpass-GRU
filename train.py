@@ -24,6 +24,13 @@ parser.add_argument(
     default="./dataset-0",
     help="Folder which should contain two subfolders ./inputs and ./expected, that represent the training dataset generated with create_dataset_v2.py",
 )
+
+parser.add_argument(
+    "--val_dataset",
+    type=str,
+    default="./dataset-1",
+    help="Folder which should contain two subfolders ./inputs and ./expected, that represent the validation dataset generated with create_dataset_v2.py",
+)
 parser.add_argument(
     "--epochs", type=int, default=50, help="The amount of epoch for training"
 )
@@ -34,46 +41,53 @@ parser.add_argument(
     "--num_layers", type=int, default=2, help="The number of layers in the GRU"
 )
 parser.add_argument(
-    "--val_size",
-    type=float,
-    default=0.2,
-    help="The ratio of validation to training set (default is 0.2)",
-)
-parser.add_argument(
     "--batch_size",
     type=int,
     default=8,
     help="The batch size in dataset (default is 8)",
 )
-
 args = parser.parse_args()
-sample_folder = args.dataset
+train_sample_folder = args.dataset
+val_sample_folder = args.val_dataset
 
-xpath = os.path.join(sample_folder, "inputs")
-ypath = os.path.join(sample_folder, "expected")
+train_inputs = []
+train_outputs = []
+val_inputs = []
+val_outputs = []
 
-inputs = []
-outputs = []
-prev_sz = 0
-for filename in sorted(os.listdir(xpath)):
-    data = np.load(os.path.join(xpath, filename))
-    inputs.append(data)
-    sz = len(data)
-    if prev_sz != 0 and prev_sz != sz:
-        print("different size in inputs : {} != {}".format(prev_sz, sz))
-    prev_sz = sz
+if not os.path.exists(train_sample_folder):
+    raise FileNotFoundError(f"Training dataset {train_sample_folder} does not exist")
+if not os.path.exists(val_sample_folder):
+    raise FileNotFoundError(f"Training dataset {val_sample_folder} does not exist")
 
-for filename in sorted(os.listdir(ypath)):
-    data = np.load(os.path.join(ypath, filename))
-    outputs.append(data)
 
-print(f"Loaded {len(inputs)} sequences")
-print(f"Input sequence length:  {len(inputs[0])} samples")
-print(f"Output sequence length: {len(outputs[0])} samples")
+def load_data_from_folder(path_to_dataset: str, inputs: list, outputs: list):
+    xpath = os.path.join(path_to_dataset, "inputs")
+    ypath = os.path.join(path_to_dataset, "expected")
 
-train_inputs, val_inputs, train_outputs, val_outputs = train_test_split(
-    inputs, outputs, test_size=args.val_size, random_state=42
-)
+    prev_sz = 0
+    for filename in sorted(os.listdir(xpath)):
+        data = np.load(os.path.join(xpath, filename))
+        inputs.append(data)
+        sz = len(data)
+        if prev_sz != 0 and prev_sz != sz:
+            print("different size in inputs : {} != {}".format(prev_sz, sz))
+            print(f"file {path_to_dataset} {filename} has size {sz}")
+            raise Exception()
+        prev_sz = sz
+
+    for filename in sorted(os.listdir(ypath)):
+        data = np.load(os.path.join(ypath, filename))
+        outputs.append(data)
+
+
+load_data_from_folder(train_sample_folder, train_inputs, train_outputs)
+load_data_from_folder(val_sample_folder, val_inputs, val_outputs)
+
+print(f"Loaded {len(train_inputs)} train sequences")
+print(f"Loaded {len(val_inputs)} val sequences")
+print(f"Input sequence length:  {len(train_inputs[0])} samples")
+print(f"Output sequence length: {len(train_inputs[0])} samples")
 
 train_ds = dataset.AudioFilterDataset(train_inputs, train_outputs, args.buffer_size)
 val_ds = dataset.AudioFilterDataset(val_inputs, val_outputs, args.buffer_size)
@@ -111,48 +125,72 @@ else:
 gru = model.LowpassRNN(hidden_size=args.hidden_size, num_layers=args.num_layers).to(
     device
 )
-
+gru = torch.compile(gru)
 optimizer = Adam(gru.parameters(), lr=1e-3)
 criterion = nn.MSELoss()
+
+
+def spectral_loss(output: Tensor, target: Tensor, eps: float = 1e-7) -> Tensor:
+    # output, target: (batch, buffer_size, 1)
+    O = torch.fft.rfft(output.squeeze(-1), dim=-1)
+    T = torch.fft.rfft(target.squeeze(-1), dim=-1)
+    log_O = torch.log(torch.abs(O) + eps)
+    log_T = torch.log(torch.abs(T) + eps)
+    return nn.functional.mse_loss(log_O, log_T)
+
+
+def batch_loop(batch_inputs, batch_targets, opt: Adam, train: bool) -> Tensor:
+    hidden = None
+
+    if train:
+        opt.zero_grad()
+    batch_loss = tensor(0.0, device=device)
+
+    all_outputs = []
+    all_targets = []
+    for t in range(batch_inputs.shape[1]):
+        x = batch_inputs[:, t, :, :].to(device)
+        y = batch_targets[:, t, :, :].to(device)
+        output, hidden = gru(x, hidden)
+        hidden = hidden.detach()
+        mse = criterion(output, y)
+        batch_loss = batch_loss + mse
+        all_outputs.append(output)
+        all_targets.append(y)
+
+    full_output = torch.cat(all_outputs, dim=1)  # (batch, total_samples, 1)
+    full_target = torch.cat(all_targets, dim=1)
+
+    batch_loss = batch_loss + 0.0001 * spectral_loss(full_output, full_target)
+    batch_loss /= batch_inputs.shape[1]
+    if train:
+        batch_loss.backward()
+        torch.nn.utils.clip_grad_norm_(gru.parameters(), max_norm=1.0)  # add this
+        opt.step()
+
+    return batch_loss
+
+
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+    optimizer, mode="min", factor=0.5, patience=3
+)
 
 for epoch in range(args.epochs):
     epoch_loss = 0.0
     validation_loss = 0.0
     # Training part
     gru.train()
+    print(f"Epoch {epoch+1}/{args.epochs} | Training Loss: {epoch_loss:.6f}")
     for batch_idx, (batch_inputs, batch_targets) in enumerate(train_dataloader):
-        hidden = None
-        optimizer.zero_grad()
-        batch_loss = tensor(0.0)
-
-        for t in range(batch_inputs.shape[1]):
-            x = batch_inputs[:, t, :, :].to(device)
-            y = batch_targets[:, t, :, :].to(device)
-            output, hidden = gru(x, hidden)
-            hidden = hidden.detach()
-            batch_loss = batch_loss + criterion(output, y)
-        batch_loss /= batch_inputs.shape[1]
-        batch_loss.backward()
-        optimizer.step()
-        epoch_loss += batch_loss.item()
-        print(
-            f"Epoch {epoch+1}/{args.epochs} | Training Batch {batch_idx+1}/{len(train_dataloader)} | Training Batch Loss: {batch_loss.item():.6f}"
-        )
+        epoch_loss += batch_loop(batch_inputs, batch_targets, optimizer, True).item()
 
     # Validation part
     gru.eval()
     with torch.no_grad():
         for batch_idx, (batch_inputs, batch_targets) in enumerate(val_dataloader):
-            hidden = None
-            batch_loss = tensor(0.0)
-
-            for t in range(batch_inputs.shape[1]):
-                x = batch_inputs[:, t, :, :].to(device)
-                y = batch_targets[:, t, :, :].to(device)
-                output, hidden = gru(x, hidden)
-                hidden = hidden.detach()
-                batch_loss = batch_loss + criterion(output, y)
-            validation_loss += batch_loss.item() / batch_inputs.shape[1]
+            validation_loss += batch_loop(
+                batch_inputs, batch_targets, optimizer, False
+            ).item()
 
     avg_train_loss = epoch_loss / len(train_dataloader)
     avg_valid_loss = validation_loss / len(val_dataloader)
@@ -164,7 +202,8 @@ for epoch in range(args.epochs):
         "epoch": epoch + 1,
         "model_state_dict": gru.state_dict(),
         "optimizer_state_dict": optimizer.state_dict(),
-        "loss": avg_train_loss,
+        "train_loss": avg_train_loss,
+        "valid_loss": avg_valid_loss,
     }
     save(checkpoint, os.path.join(checkpoint_folder, f"checkpoint_epoch{epoch+1}.pt"))
 
@@ -175,6 +214,8 @@ for epoch in range(args.epochs):
         print(f"   ↳ New best model saved (loss: {best_loss:.6f})")
     if cuda_available:
         torch.cuda.empty_cache()
+
+    scheduler.step(avg_valid_loss)
 
 save(gru.state_dict(), os.path.join(checkpoint_folder, "lowpass_rnn.pt"))
 print("Final model saved to " + os.path.join(checkpoint_folder, "lowpass_rnn.pt"))

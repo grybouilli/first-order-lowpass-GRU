@@ -54,12 +54,20 @@ def exponential_sweep(
     return (sweep * fade).astype(np.float32)
 
 
+class RampTypes:
+    growing_linear = "growing_linear"
+    decreasing_linear = "decreasing_linear"
+    gaussian_distrib = "gaussian_distrib"
+    no_ramp = "no_ramp"
+
+
 def bandlimited_white_noise(
     n_samples: int,
     sample_rate: float,
     f_low: float = 20.0,
     f_high: float | None = None,
     amplitude_ramp: bool = True,
+    ramp_type: str = RampTypes.growing_linear,
     fade_samples: int = 256,
 ) -> np.ndarray:
     """
@@ -126,12 +134,34 @@ def bandlimited_white_noise(
     # Apply FIR with zero-phase filtering (lfilter would introduce group delay)
     noise = sp_signal.filtfilt(fir, [1.0], noise).astype(np.float32)
 
-    # ── 3. Amplitude ramp  (0 → 1 linear) ───────────────────────────────────
-    if amplitude_ramp:
-        ramp = np.linspace(0.0, 1.0, n_samples, dtype=np.float32)
-        noise = noise * ramp
+    # ── 3. Peak-normalise to ±1 ──────────────────────────────────────────────
+    peak = np.max(np.abs(noise))
+    if peak > 0:
+        noise /= peak
 
-    # ── 4. Fade-in / fade-out taper (cos² shape, smoother than linear) ──────
+    # ── 4. Amplitude ramp  (0 → 1 linear) ───────────────────────────────────
+    if amplitude_ramp:
+        match ramp_type:
+            case RampTypes.growing_linear:
+                ramp = np.linspace(0.0, 1.0, n_samples, dtype=np.float32)
+                noise = noise * ramp
+            case RampTypes.decreasing_linear:
+                ramp = np.linspace(1.0, 0.0, n_samples, dtype=np.float32)
+                noise = noise * ramp
+            case RampTypes.gaussian_distrib:
+                mu = 0
+                sigma = 0.1
+                gaussian_distrib = lambda x: np.exp(
+                    -((x - mu) ** 2) / (2 * sigma**2)
+                ) / np.sqrt(2 * np.pi * sigma**2)
+                x = np.linspace(-0.5, 0.5, n_samples, dtype=np.float32)
+                ramp = gaussian_distrib(x)
+                ramp /= max(ramp)  # keep in range [0,1]
+                noise = noise * ramp
+            case RampTypes.no_ramp:
+                pass
+
+    # ── 5. Fade-in / fade-out taper (cos² shape, smoother than linear) ──────
     if fade_samples > 0:
         t = np.linspace(0.0, np.pi / 2, fade_samples, dtype=np.float32)
         taper = np.sin(t) ** 2  # 0 → 1  (cos² fade-in)
@@ -139,11 +169,6 @@ def bandlimited_white_noise(
         fade[:fade_samples] = taper
         fade[-fade_samples:] = taper[::-1]
         noise = noise * fade
-
-    # ── 5. Peak-normalise to ±1 ──────────────────────────────────────────────
-    peak = np.max(np.abs(noise))
-    if peak > 0:
-        noise /= peak
 
     return noise
 
@@ -182,9 +207,7 @@ def make_dataset_signal(
     min_fc: float,
     max_fc: float,
     amount_of_fc: int,
-    sweep_fraction: float = 0.5,
     cheby_ripple: float = 0.5,
-    signal_per_fc: int = 6,
 ) -> np.ndarray:
     """
     Concatenate an exponential sine sweep and bandlimited white noise.
@@ -196,14 +219,47 @@ def make_dataset_signal(
     """
     if filter_algo not in Filters.algo.keys():
         raise Exception(f"Unknown filter algorithm: {filter_algo}")
-    n_sweep = int(total_samples * sweep_fraction)
-    n_noise = total_samples - n_sweep
 
     cutoffs = np.geomspace(min_fc, max_fc, amount_of_fc)
     x, y = [], []
-    print("Generating samples...")
+    print("Generating sine sweeps...")
+    f_min = min(10, f_low + uniform(-5, 4))
+    f_max = max(sample_rate / 2, f_high + uniform(-15, 24))
+    sweep = exponential_sweep(
+        total_samples, f1=f_min, f2=f_max, sample_rate=sample_rate
+    )
+    noises = []
 
-    def generate_signals_for_fc(fc: float) -> None:
+    print(f"Sine sweep sample amount = {len(sweep)}")
+    print("Generating white noises...")
+
+    def gen_noise(ramp_type: str):
+        noises.append(
+            bandlimited_white_noise(
+                total_samples,
+                sample_rate,
+                f_low=f_low,
+                f_high=f_high,
+                amplitude_ramp=True,
+                ramp_type=ramp_type,
+            )
+        )
+
+    for ramp in [
+        RampTypes.growing_linear,
+        RampTypes.decreasing_linear,
+        RampTypes.gaussian_distrib,
+        RampTypes.no_ramp,
+    ]:
+        gen_noise(ramp)
+
+    print(f"Noise sample amount = {len(noises[0])}")
+    print(f"Noise sample amount = {len(noises[1])}")
+    print(f"Noise sample amount = {len(noises[2])}")
+
+    print("Filtering signals...")
+    for fc in cutoffs:
+        print(f"FC = {fc}")
         b, a = 0, 0
         match filter_algo:
             case Filters.butter:
@@ -214,30 +270,16 @@ def make_dataset_signal(
                 b, a = Filters.algo[Filters.butter](
                     filter_order, cheby_ripple, fc, btype=filter_type, fs=sample_rate
                 )
-        # for fc in cutoffs:
-        for _ in range(signal_per_fc):
-            f_min = min(10, f_low + uniform(-5, 4))
-            f_max = max(sample_rate / 2, f_high + uniform(-15, 24))
-            sweep = exponential_sweep(
-                total_samples, f1=f_min, f2=f_max, sample_rate=sample_rate
-            )
-            noise = bandlimited_white_noise(
-                total_samples,
-                sample_rate,
-                f_low=f_low,
-                f_high=f_high,
-                amplitude_ramp=True,
-            )
 
-            y.append(sp_signal.lfilter(b, a, sweep).astype(np.float32))
-            sweep = np.append(sweep, normalize_freq(fc, sample_rate))
-            x.append(sweep)
+        y.append(sp_signal.lfilter(b, a, sweep).astype(np.float32))
+        sweep_plus_freq = np.append(sweep, normalize_freq(fc, sample_rate))
+        x.append(sweep_plus_freq)
 
+        for noise in noises:
             y.append(sp_signal.lfilter(b, a, noise).astype(np.float32))
-            noise = np.append(noise, normalize_freq(fc, sample_rate))
-            x.append(noise)
+            noise_plus_freq = np.append(noise, normalize_freq(fc, sample_rate))
+            x.append(noise_plus_freq)
 
-    Parallel(n_jobs=-1)(delayed(generate_signals_for_fc)(fc) for fc in cutoffs)
     print("Done generating samples")
 
     return x, y
@@ -306,13 +348,6 @@ if __name__ == "__main__":
         help="Chebyshev passband or stopband ripple value ; is ignored if specified for a filter that is not cheby1 or cheby2",
     )
 
-    parser.add_argument(
-        "--signal_per_fc",
-        type=int,
-        default=6,
-        help="The amount of pair of sine-sweep and white noise generated per cut-off fc (prefer an even number)",
-    )
-
     args = parser.parse_args()
 
     if args.max_buffer_amount < 0:
@@ -336,7 +371,7 @@ if __name__ == "__main__":
     sample_folder = ""
     while True:
         try:
-            sample_folder = f"dataset-{run_id}"
+            sample_folder = f"dataset-{args.filter_algo}-{args.filter_type}-{args.filter_order}-{run_id}"
             os.makedirs(sample_folder)
             break
         except OSError:
