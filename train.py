@@ -22,14 +22,14 @@ parser.add_argument(
     "--dataset",
     type=str,
     default="./dataset-0",
-    help="Folder which should contain two subfolders ./inputs and ./expected, that represent the training dataset generated with create_dataset_v2.py",
+    help="Folder which should contain two subfolders ./inputs and ./expected, that represent the training dataset generated with create_dataset.py",
 )
 
 parser.add_argument(
     "--val_dataset",
     type=str,
     default="./dataset-1",
-    help="Folder which should contain two subfolders ./inputs and ./expected, that represent the validation dataset generated with create_dataset_v2.py",
+    help="Folder which should contain two subfolders ./inputs and ./expected, that represent the validation dataset generated with create_dataset.py",
 )
 parser.add_argument(
     "--epochs", type=int, default=50, help="The amount of epoch for training"

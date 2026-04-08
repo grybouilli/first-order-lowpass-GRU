@@ -92,7 +92,7 @@ This repo contains python scripts for :
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-$^*$: See function `normalize_freq` in [`create_dataset_v2.py`](./create_dataset_v2.py).
+$^*$: See function `normalize_freq` in [`create_dataset.py`](./create_dataset.py).
 <!-- GETTING STARTED -->
 ## Getting Started
 ### Prerequisites
@@ -137,13 +137,13 @@ Because the normalized frequency is stored in the input array, inputs will have 
 
 Example of command to generate a dataset :
 ```bash
-$ python create_dataset_v2.py --sample_rate=48000 --buffer_size=128 --amount_of_fc=300 --max_buffer_amount=5
+$ python create_dataset.py --sample_rate=48000 --buffer_size=128 --amount_of_fc=300 --max_buffer_amount=5
 ```
 
 An overview of the available parameters to generate the dataset:
 ```bash
-$ python create_dataset_v2.py --help
-usage: create_dataset_v2.py [-h] [--sample_rate SAMPLE_RATE] [--buffer_size BUFFER_SIZE] [--amount_of_fc AMOUNT_OF_FC]
+$ python create_dataset.py --help
+usage: create_dataset.py [-h] [--sample_rate SAMPLE_RATE] [--buffer_size BUFFER_SIZE] [--amount_of_fc AMOUNT_OF_FC]
                             [--max_buffer_amount MAX_BUFFER_AMOUNT]
 
 options:
@@ -176,7 +176,7 @@ options:
   --buffer_size BUFFER_SIZE
                         Amount of samples passed as input to the GRU model during forward pass
   --dataset DATASET     Folder which should contain two subfolders ./inputs and ./expected, that represent the training dataset generated with
-                        create_dataset_v2.py
+                        create_dataset.py
   --epochs EPOCHS       The amount of epoch for training
   --hidden_size HIDDEN_SIZE
                         The hidden size of the GRU
