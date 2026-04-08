@@ -1,4 +1,4 @@
-from create_dataset_v2 import normalize_freq
+from create_dataset import normalize_freq
 from model import LowpassRNN
 import numpy as np
 import torch

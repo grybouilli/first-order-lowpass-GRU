@@ -229,7 +229,7 @@ def make_dataset_signal(
     print("Generating impulse...")
     from scipy.signal import unit_impulse
 
-    imp = unit_impulse(buffer_size * max_buffer_count, ifx="mid")
+    imp = unit_impulse(buffer_size * max_buffer_count, idx="mid")
     print("Impulse sample amount = {}".format(len(imp)))
 
     print("Generating sine sweeps...")
@@ -251,7 +251,7 @@ def make_dataset_signal(
     print(f"Sine sweep sample amount = {len(sweeps[1])}")
     print("Generating white noises...")
 
-    def gen_noise(ramp_type: str):
+    def gen_noise(noises: list, ramp_type: str):
         noises.append(
             bandlimited_white_noise(
                 total_samples,
@@ -263,14 +263,22 @@ def make_dataset_signal(
             )
         )
 
-    for ramp in [
-        RampTypes.growing_linear,
-        RampTypes.decreasing_linear,
-        RampTypes.gaussian_distrib,
-        RampTypes.no_ramp,
-    ]:
-        gen_noise(ramp)
-
+    # for ramp in [
+    #     RampTypes.growing_linear,
+    #     RampTypes.decreasing_linear,
+    #     RampTypes.gaussian_distrib,
+    #     RampTypes.no_ramp,
+    # ]:
+    #     gen_noise(ramp)
+    Parallel(n_jobs=-1, require="sharedmem")(
+        delayed(gen_noise)(noises, ramp)
+        for ramp in [
+            RampTypes.growing_linear,
+            RampTypes.decreasing_linear,
+            RampTypes.gaussian_distrib,
+            RampTypes.no_ramp,
+        ]
+    )
     print(f"Noise sample amount = {len(noises[0])}")
     print(f"Noise sample amount = {len(noises[1])}")
     print(f"Noise sample amount = {len(noises[2])}")

@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from joblib import Parallel, delayed
 from torch.nn import Module
-from create_dataset_v2 import normalize_freq
+from create_dataset import normalize_freq
 from model_tools import run_inference
 
 
