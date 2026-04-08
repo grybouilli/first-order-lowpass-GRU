@@ -46,6 +46,13 @@ parser.add_argument(
     default=8,
     help="The batch size in dataset (default is 8)",
 )
+
+parser.add_argument(
+    "--initial_lr",
+    type=float,
+    default=10**-3,
+    help="The initial learning rate (default is 10**-3)",
+)
 args = parser.parse_args()
 train_sample_folder = args.dataset
 val_sample_folder = args.val_dataset
@@ -73,7 +80,7 @@ def load_data_from_folder(path_to_dataset: str, inputs: list, outputs: list):
         if prev_sz != 0 and prev_sz != sz:
             print("different size in inputs : {} != {}".format(prev_sz, sz))
             print(f"file {path_to_dataset} {filename} has size {sz}")
-            raise Exception()
+            # raise Exception()
         prev_sz = sz
 
     for filename in sorted(os.listdir(ypath)):
@@ -126,7 +133,7 @@ gru = model.LowpassRNN(hidden_size=args.hidden_size, num_layers=args.num_layers)
     device
 )
 gru = torch.compile(gru)
-optimizer = Adam(gru.parameters(), lr=1e-3)
+optimizer = Adam(gru.parameters(), lr=args.initial_lr)
 criterion = nn.MSELoss()
 
 
@@ -172,31 +179,47 @@ def batch_loop(batch_inputs, batch_targets, opt: Adam, train: bool) -> Tensor:
 
 
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-    optimizer, mode="min", factor=0.5, patience=3
+    optimizer, mode="min", factor=0.1, patience=3
 )
 
+
+def progress_bar(epoch: int, total_epoch: int, current: int, total: int, width=40):
+    percent = current / total
+    filled = int(width * percent)
+    bar = "█" * filled + "░" * (width - filled)
+    print(
+        f"\r[{bar}] {percent:.0%} ({current}/{total} Batch) | Epoch {epoch+1}/{total_epoch}",
+        end="",
+        flush=True,
+    )
+
+
+train_batch_amount = len(train_dataloader)
+valid_batch_amount = len(val_dataloader)
 for epoch in range(args.epochs):
     epoch_loss = 0.0
     validation_loss = 0.0
     # Training part
     gru.train()
-    print(f"Epoch {epoch+1}/{args.epochs} | Training Loss: {epoch_loss:.6f}")
     for batch_idx, (batch_inputs, batch_targets) in enumerate(train_dataloader):
+        progress_bar(epoch, args.epochs, batch_idx + 1, train_batch_amount)
         epoch_loss += batch_loop(batch_inputs, batch_targets, optimizer, True).item()
 
     # Validation part
+    print("\nValidation set\n")
     gru.eval()
     with torch.no_grad():
         for batch_idx, (batch_inputs, batch_targets) in enumerate(val_dataloader):
+            progress_bar(epoch, args.epochs, batch_idx + 1, valid_batch_amount)
             validation_loss += batch_loop(
                 batch_inputs, batch_targets, optimizer, False
             ).item()
 
-    avg_train_loss = epoch_loss / len(train_dataloader)
-    avg_valid_loss = validation_loss / len(val_dataloader)
+    avg_train_loss = epoch_loss / train_batch_amount
+    avg_valid_loss = validation_loss / valid_batch_amount
     # Save checkpoint every epoch
     print(
-        f"── Epoch {epoch+1} complete | Avg train loss: {avg_train_loss:.6f} | Avg validation loss: {avg_valid_loss:.6f}"
+        f"\n── Epoch {epoch+1} complete | Avg train loss: {avg_train_loss:.6f} | Avg validation loss: {avg_valid_loss:.6f}"
     )
     checkpoint = {
         "epoch": epoch + 1,
