@@ -200,7 +200,8 @@ def make_dataset_signal(
     filter_algo: str,
     filter_type: str,
     filter_order: int,
-    total_samples: int,
+    buffer_size: int,
+    max_buffer_count: int,
     sample_rate: float,
     f_low: float,
     f_high: float,
@@ -217,20 +218,37 @@ def make_dataset_signal(
     - The sweep exercises all frequencies sequentially at fixed amplitude.
     - The noise exercises all frequencies simultaneously across all amplitudes.
     """
+
+    total_samples = buffer_size * max_buffer_count
     if filter_algo not in Filters.algo.keys():
         raise Exception(f"Unknown filter algorithm: {filter_algo}")
 
     cutoffs = np.geomspace(min_fc, max_fc, amount_of_fc)
     x, y = [], []
+
+    print("Generating impulse...")
+    from scipy.signal import unit_impulse
+
+    imp = unit_impulse(buffer_size * max_buffer_count, ifx="mid")
+    print("Impulse sample amount = {}".format(len(imp)))
+
     print("Generating sine sweeps...")
-    f_min = min(10, f_low + uniform(-5, 4))
-    f_max = max(sample_rate / 2, f_high + uniform(-15, 24))
-    sweep = exponential_sweep(
-        total_samples, f1=f_min, f2=f_max, sample_rate=sample_rate
+    sweeps = []
+
+    sweeps.append(
+        exponential_sweep(
+            total_samples, f1=f_low, f2=f_high / 2, sample_rate=sample_rate
+        )
+    )
+    sweeps.append(
+        exponential_sweep(
+            total_samples, f1=f_high / 2, f2=f_high, sample_rate=sample_rate
+        )
     )
     noises = []
 
-    print(f"Sine sweep sample amount = {len(sweep)}")
+    print(f"Sine sweep sample amount = {len(sweeps[0])}")
+    print(f"Sine sweep sample amount = {len(sweeps[1])}")
     print("Generating white noises...")
 
     def gen_noise(ramp_type: str):
@@ -259,7 +277,7 @@ def make_dataset_signal(
 
     print("Filtering signals...")
     for fc in cutoffs:
-        print(f"FC = {fc}")
+        # print(f"FC = {fc}")
         b, a = 0, 0
         match filter_algo:
             case Filters.butter:
@@ -271,8 +289,16 @@ def make_dataset_signal(
                     filter_order, cheby_ripple, fc, btype=filter_type, fs=sample_rate
                 )
 
-        y.append(sp_signal.lfilter(b, a, sweep).astype(np.float32))
-        sweep_plus_freq = np.append(sweep, normalize_freq(fc, sample_rate))
+        y.append(sp_signal.lfilter(b, a, imp).astype(np.float32))
+        imp_plus_freq = np.append(imp, normalize_freq(fc, sample_rate))
+        x.append(imp_plus_freq)
+
+        y.append(sp_signal.lfilter(b, a, sweeps[0]).astype(np.float32))
+        sweep_plus_freq = np.append(sweeps[0], normalize_freq(fc, sample_rate))
+        x.append(sweep_plus_freq)
+
+        y.append(sp_signal.lfilter(b, a, sweeps[1]).astype(np.float32))
+        sweep_plus_freq = np.append(sweeps[1], normalize_freq(fc, sample_rate))
         x.append(sweep_plus_freq)
 
         for noise in noises:
@@ -357,7 +383,8 @@ if __name__ == "__main__":
         args.filter_algo,
         args.filter_type,
         args.filter_order,
-        args.buffer_size * args.max_buffer_amount,
+        args.buffer_size,
+        args.max_buffer_amount,
         args.sample_rate,
         f_low=20,
         f_high=args.sample_rate / 2 - 1,
