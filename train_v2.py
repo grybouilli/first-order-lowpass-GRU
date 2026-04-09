@@ -147,19 +147,19 @@ def spectral_loss(output: Tensor, target: Tensor, eps: float = 1e-7) -> Tensor:
     return nn.functional.mse_loss(log_O, log_T)
 
 
-def batch_loop(batch_inputs, batch_targets, opt: Adam, train: bool) -> Tensor:
+def batch_loop(batch_inputs, batch_targets, opt: Adam, train: bool) -> float:
     tbptt_steps = 20  # tune this
 
     if train:
         opt.zero_grad()
 
-    batch_loss = torch.tensor(0.0, device=device)
+    batch_loss = 0.0
 
     for inp, y in zip(batch_inputs, batch_targets):
         hidden = None
 
         buffers = len(inp) // args.buffer_size
-        loss_accum = 0.0
+        loss_accum = torch.tensor(0.0, device=device)
 
         for buffer in range(buffers):
             beg = buffer * args.buffer_size
@@ -173,17 +173,18 @@ def batch_loop(batch_inputs, batch_targets, opt: Adam, train: bool) -> Tensor:
             loss = criterion(y_pred, target) + 0.0001 * spectral_loss(y_pred, target)
             loss_accum += loss
 
+            batch_loss += loss_accum.item()
             if train and (buffer + 1) % tbptt_steps == 0:
-                loss_accum.backward()
+                (loss_accum / tbptt_steps).backward()
 
                 torch.nn.utils.clip_grad_norm_(gru.parameters(), 1.0)
                 opt.step()
                 opt.zero_grad()
 
                 hidden = hidden.detach()
-                loss_accum = 0.0
+                loss_accum = torch.tensor(0.0, device=device)
 
-        batch_loss += loss_accum
+        batch_loss /= buffers
 
     return batch_loss
 
@@ -214,7 +215,7 @@ for epoch in range(args.epochs):
     gru.train()
     for batch_idx, (batch_inputs, batch_targets) in enumerate(train_dataloader):
         progress_bar(epoch, args.epochs, batch_idx + 1, train_batch_amount)
-        epoch_loss += batch_loop(batch_inputs, batch_targets, optimizer, True).item()
+        epoch_loss += batch_loop(batch_inputs, batch_targets, optimizer, True)
 
     # Validation part
     print("\nValidation set")
@@ -222,9 +223,7 @@ for epoch in range(args.epochs):
     with torch.no_grad():
         for batch_idx, (batch_inputs, batch_targets) in enumerate(val_dataloader):
             progress_bar(epoch, args.epochs, batch_idx + 1, valid_batch_amount)
-            validation_loss += batch_loop(
-                batch_inputs, batch_targets, optimizer, False
-            ).item()
+            validation_loss += batch_loop(batch_inputs, batch_targets, optimizer, False)
 
     avg_train_loss = epoch_loss / train_batch_amount
     avg_valid_loss = validation_loss / valid_batch_amount

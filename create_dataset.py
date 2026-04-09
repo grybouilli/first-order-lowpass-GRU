@@ -293,7 +293,7 @@ def make_dataset_signal(
                     filter_order, fc, btype=filter_type, fs=sample_rate
                 )
             case Filters.cheby1:
-                b, a = Filters.algo[Filters.butter](
+                b, a = Filters.algo[Filters.cheby1](
                     filter_order, cheby_ripple, fc, btype=filter_type, fs=sample_rate
                 )
 
