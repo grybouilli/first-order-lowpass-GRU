@@ -156,6 +156,46 @@ def plot_bode_ref_filter(
     return fig, axes
 
 
+def plot_cheby_into(
+    axes: plt.axes.Axes,
+    cutoff_freq: float,
+    order: int,
+    ripple: float,
+    sample_rate: int,
+    n_freqs: int = 100,
+    fmt: str = "--",
+    label: str = "Reference Filter",
+    show=True,
+):
+    from scipy.signal import cheby1
+
+    filt = lambda: cheby1(
+        order, ripple, 2 * cutoff_freq / sample_rate, btype="low", analog=False
+    )
+    return plot_bode_ref_filter_into(axes, filt, sample_rate, n_freqs, fmt, label)
+
+
+def plot_cheby(
+    axes: plt.axes.Axes,
+    cutoff_freq: float,
+    order: int,
+    ripple: float,
+    sample_rate: int,
+    n_freqs: int = 100,
+    fmt: str = "--",
+    label: str = "Reference Filter",
+    show=True,
+):
+    from scipy.signal import cheby1
+
+    filt = lambda: cheby1(
+        order, ripple, 2 * cutoff_freq / sample_rate, btype="low", analog=False
+    )
+    return plot_bode_ref_filter(
+        filt, cutoff_freq, sample_rate, n_freqs, fmt, label, show
+    )
+
+
 def plot_butter_worth_into(
     axes: plt.axes.Axes,
     cutoff_freq: float,
