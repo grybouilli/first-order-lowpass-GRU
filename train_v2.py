@@ -3,6 +3,7 @@ import dataset_v2
 import os, argparse
 import soundfile as sf
 import numpy as np
+import torchaudio
 from torch.utils.data import DataLoader
 from torch import Tensor, tensor, save, where, full_like, ones_like
 from torch.optim import Adam
@@ -53,6 +54,14 @@ parser.add_argument(
     default=10**-3,
     help="The initial learning rate (default is 10**-3)",
 )
+
+parser.add_argument(
+    "--notes",
+    type=str,
+    default="",
+    help="Notes about the training",
+)
+
 args = parser.parse_args()
 train_sample_folder = args.dataset
 val_sample_folder = args.val_dataset
@@ -99,8 +108,12 @@ print(f"Output sequence length: {len(train_inputs[0])} samples")
 train_ds = dataset_v2.AudioFilterDataset(train_inputs, train_outputs, args.buffer_size)
 val_ds = dataset_v2.AudioFilterDataset(val_inputs, val_outputs, args.buffer_size)
 
-train_dataloader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True)
-val_dataloader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False)
+train_dataloader = DataLoader(
+    train_ds, batch_size=args.batch_size, shuffle=True, pin_memory=True
+)
+val_dataloader = DataLoader(
+    val_ds, batch_size=args.batch_size, shuffle=False, pin_memory=True
+)
 
 checkpoint_folder_base = f"checkpoints-{args.dataset.strip(".").strip("/")}"
 checkpoint_folder = ""
@@ -147,46 +160,57 @@ def spectral_loss(output: Tensor, target: Tensor, eps: float = 1e-7) -> Tensor:
     return nn.functional.mse_loss(log_O, log_T)
 
 
+# reconstruction loss used in DDSP paper
+nfft = int(args.buffer_size * 0.5)
+spectrogram = torchaudio.transforms.Spectrogram(n_fft=nfft).to(device=device)
+
+
+def multi_scale_spectral_loss(
+    output: Tensor,
+    target: Tensor,
+    eps: float = 1e-7,
+    alpha: float = 1.0,
+) -> Tensor:
+    S_O = spectrogram(output.squeeze(-1))
+    S_T = spectrogram(target.squeeze(-1))
+
+    return torch.sum(torch.abs(S_O - S_T)) + alpha * torch.sum(
+        torch.abs(torch.log(S_O + eps) - torch.log(S_T + eps))
+    )
+
+
 def batch_loop(batch_inputs, batch_targets, opt: Adam, train: bool) -> float:
-    tbptt_steps = 20  # tune this
+    # batch_inputs: (batch, seq_len, 1) — move whole batch at once
+    batch_inputs = batch_inputs.to(device)
+    batch_targets = batch_targets.to(device)
 
     if train:
         opt.zero_grad()
 
-    batch_loss = 0.0
+    B, total_len, C = batch_inputs.shape
+    buffers = total_len // args.buffer_size
+    hidden = None
+    loss_accum = torch.tensor(0.0, device=device)
 
-    for inp, y in zip(batch_inputs, batch_targets):
-        hidden = None
+    for buffer in range(buffers):
+        beg = buffer * args.buffer_size
+        end = (buffer + 1) * args.buffer_size
 
-        buffers = len(inp) // args.buffer_size
-        loss_accum = torch.tensor(0.0, device=device)
+        x = batch_inputs[:, beg:end, :]  # (B, buffer_size, 1)
+        target = batch_targets[:, beg:end, :]  # (B, buffer_size, 1)
 
-        for buffer in range(buffers):
-            beg = buffer * args.buffer_size
-            end = (buffer + 1) * args.buffer_size
+        y_pred, hidden = gru(x, hidden)
+        hidden = hidden.detach()
+        loss_accum += multi_scale_spectral_loss(y_pred, target)
 
-            x = inp[beg:end].to(device)
-            target = y[beg:end].to(device)
+    loss_accum /= buffers
 
-            y_pred, hidden = gru(x, hidden)
+    if train:
+        loss_accum.backward()
+        torch.nn.utils.clip_grad_norm_(gru.parameters(), 1.0)
+        opt.step()
 
-            loss = criterion(y_pred, target) + 0.0001 * spectral_loss(y_pred, target)
-            loss_accum += loss
-
-            batch_loss += loss_accum.item()
-            if train and (buffer + 1) % tbptt_steps == 0:
-                (loss_accum / tbptt_steps).backward()
-
-                torch.nn.utils.clip_grad_norm_(gru.parameters(), 1.0)
-                opt.step()
-                opt.zero_grad()
-
-                hidden = hidden.detach()
-                loss_accum = torch.tensor(0.0, device=device)
-
-        batch_loss /= buffers
-
-    return batch_loss
+    return loss_accum.item()
 
 
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -237,6 +261,10 @@ for epoch in range(args.epochs):
         "optimizer_state_dict": optimizer.state_dict(),
         "train_loss": avg_train_loss,
         "valid_loss": avg_valid_loss,
+        "buffer_size": args.buffer_size,
+        "initial_lr": args.initial_lr,
+        "batch_size": args.batch_size,
+        "notes": args.notes,
     }
     save(checkpoint, os.path.join(checkpoint_folder, f"checkpoint_epoch{epoch+1}.pt"))
 
