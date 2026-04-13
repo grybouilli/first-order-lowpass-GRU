@@ -55,7 +55,7 @@ def filter_phases(
     def process_freq(freq):
         p = sample_rate / freq
         m = (buffer_count * buffer_size) // p
-        t = np.linspace(0, m / freq, buffer_size * buffer_count)
+        t = np.linspace(0, m / freq, buffer_size * buffer_count, endpoint=False)
         input_signal = np.cos(2 * np.pi * freq * t)
         signal = filter_for_fc(input_signal, fc_hertz)
         return signal_phase_at_f(t, signal, freq)
@@ -108,7 +108,7 @@ def plot_bode_GRU_into(
             cutoff_freq,
             sample_rate=sample_rate,
         )
-        axes.semilogx(freqs, np.angle(phases), fmt, label=label)
+        axes.semilogx(freqs, np.unwrap(phases), fmt, label=label)
 
 
 def plot_bode_GRU(
