@@ -109,6 +109,25 @@ Start by creating a virtual python environment and install the needed dependenci
   pip install -r requirements.txt # Check wanted pytorch package before running this line
   ```
 
+### Trained models
+The folders [order1](./order1) and [order2](./order2) contains already trained models :
+
+* [order1/butter_lowpass.pt](order1/butter_lowpass.pt) : 
+  * hidden size = 64
+  * num layers = 2
+  * sample rate = 48000
+  * minimum prefered buffer size = 128
+  * filter algo = butterworth
+  * filter type = lowpass
+* [order2/cheby1_ripple5_low.pt](order2/cheby1_ripple5_low.pt) : 
+  * hidden size = 128
+  * num layers = 2
+  * sample rate = 48000
+  * minimum prefered buffer size = 256
+  * filter algo = cheby1
+  * ripple value = 5
+  * filter type = lowpass
+
 ### Training
 Here we present how to train your own model and the recommended parameters to use.
 
