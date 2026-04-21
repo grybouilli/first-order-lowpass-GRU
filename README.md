@@ -162,7 +162,7 @@ The obtained model produced the following bode plots :
 ![](./media/bode_2500.png)
 
 ##### Second-order
-Great result were obtained with a GRU model of **hidden size 128** and of **number of layers equal to 2**. The amount of cutoff frequencies during training was 400, batch size was 16.
+Great result were obtained with a GRU model of **hidden size 128** and of **number of layers equal to 2**. The amount of cutoff frequencies during training was 450, batch size was 8.
 
 The sample rate used was 48kHz. The buffer size during training was 1024. The number of epochs was 50. The model was trained using a NVIDIA RTX PRO 5000 Blackwell.
 
