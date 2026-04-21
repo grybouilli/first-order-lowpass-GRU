@@ -226,11 +226,12 @@ def plot_cheby_into(
     label: str = "Reference Filter",
     show=True,
     plot_type: str = "gain",
+    filter_type: str = "low",
 ):
     from scipy.signal import cheby1
 
     filt = lambda: cheby1(
-        order, ripple, 2 * cutoff_freq / sample_rate, btype="low", analog=False
+        order, ripple, 2 * cutoff_freq / sample_rate, btype=filter_type, analog=False
     )
     return plot_bode_ref_filter_into(
         axes, filt, sample_rate, n_freqs, fmt, label, plot_type=plot_type
@@ -248,11 +249,12 @@ def plot_cheby(
     label: str = "Reference Filter",
     show=True,
     plot_type: str = "gain",
+    filter_type: str = "low",
 ):
     from scipy.signal import cheby1
 
     filt = lambda: cheby1(
-        order, ripple, 2 * cutoff_freq / sample_rate, btype="low", analog=False
+        order, ripple, 2 * cutoff_freq / sample_rate, btype=filter_type, analog=False
     )
     return plot_bode_ref_filter(
         filt, cutoff_freq, sample_rate, n_freqs, fmt, label, show, plot_type=plot_type
@@ -269,11 +271,12 @@ def plot_butter_worth_into(
     label: str = "Reference Filter",
     show=True,
     plot_type: str = "gain",
+    filter_type: str = "low",
 ):
     from scipy.signal import butter
 
     filt = lambda: butter(
-        order, 2 * cutoff_freq / sample_rate, btype="low", analog=False
+        order, 2 * cutoff_freq / sample_rate, btype=filter_type, analog=False
     )
     return plot_bode_ref_filter_into(
         axes, filt, sample_rate, n_freqs, fmt, label, plot_type=plot_type
