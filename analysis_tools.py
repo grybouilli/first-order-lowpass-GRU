@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 from joblib import Parallel, delayed
 from torch.nn import Module
 from create_dataset import normalize_freq
@@ -123,7 +124,7 @@ def plot_bode_GRU(
     label: str = "GRU Filter",
     show=True,
     plot_type: str = "gain",
-) -> tuple[plt.figure.Figure, Axes]:
+) -> tuple[Figure, Axes]:
     fig = plt.figure(figsize=(10, 5))
     axes = fig.add_axes(rect=[0.125, 0.11, 0.775, 0.77])
     plot_bode_GRU_into(
@@ -191,7 +192,7 @@ def plot_bode_ref_filter(
     label: str = "Reference Filter",
     show=True,
     plot_type: str = "gain",
-) -> tuple[plt.figure.Figure, Axes]:
+) -> tuple[Figure, Axes]:
     fig = plt.figure(figsize=(10, 5))
     axes = fig.add_axes(rect=[0.125, 0.11, 0.775, 0.77])
     plot_bode_ref_filter_into(
