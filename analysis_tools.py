@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
 from joblib import Parallel, delayed
 from torch.nn import Module
 from create_dataset import normalize_freq
@@ -64,7 +65,7 @@ def filter_phases(
 
 
 def plot_bode_GRU_into(
-    axes: plt.axes.Axes,
+    axes: Axes,
     model: Module,
     cutoff_freq: float,
     buffer_size: int,
@@ -122,7 +123,7 @@ def plot_bode_GRU(
     label: str = "GRU Filter",
     show=True,
     plot_type: str = "gain",
-) -> tuple[plt.figure.Figure, plt.axes.Axes]:
+) -> tuple[plt.figure.Figure, Axes]:
     fig = plt.figure(figsize=(10, 5))
     axes = fig.add_axes(rect=[0.125, 0.11, 0.775, 0.77])
     plot_bode_GRU_into(
@@ -157,7 +158,7 @@ def plot_bode_GRU(
 
 
 def plot_bode_ref_filter_into(
-    axes: plt.axes.Axes,
+    axes: Axes,
     filt: callable,
     sample_rate: int,
     n_freqs: int = 100,
@@ -190,7 +191,7 @@ def plot_bode_ref_filter(
     label: str = "Reference Filter",
     show=True,
     plot_type: str = "gain",
-) -> tuple[plt.figure.Figure, plt.axes.Axes]:
+) -> tuple[plt.figure.Figure, Axes]:
     fig = plt.figure(figsize=(10, 5))
     axes = fig.add_axes(rect=[0.125, 0.11, 0.775, 0.77])
     plot_bode_ref_filter_into(
@@ -216,7 +217,7 @@ def plot_bode_ref_filter(
 
 
 def plot_cheby_into(
-    axes: plt.axes.Axes,
+    axes: Axes,
     cutoff_freq: float,
     order: int,
     ripple: float,
@@ -239,7 +240,7 @@ def plot_cheby_into(
 
 
 def plot_cheby(
-    axes: plt.axes.Axes,
+    axes: Axes,
     cutoff_freq: float,
     order: int,
     ripple: float,
@@ -262,7 +263,7 @@ def plot_cheby(
 
 
 def plot_butter_worth_into(
-    axes: plt.axes.Axes,
+    axes: Axes,
     cutoff_freq: float,
     order: int,
     sample_rate: int,
