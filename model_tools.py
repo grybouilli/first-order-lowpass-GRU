@@ -38,3 +38,30 @@ def run_inference(
             output_buffers.append(output.squeeze().cpu().numpy())  # (buffer_size,)
 
     return np.concatenate(output_buffers)  # (N,)
+
+
+def load_gru_model(
+    filename: str, hidden_size: int, num_layers: int, device: str = "cpu"
+):
+    try:
+        checkpoint = torch.load(filename)
+    except RuntimeError:
+        checkpoint = torch.load(filename, map_location=torch.device(device))
+    gru = LowpassRNN(hidden_size=hidden_size, num_layers=num_layers)
+
+    try:
+        gru.load_state_dict(checkpoint)
+    except Exception:
+        # The model was compiled during training, so the ckpt keys are different
+        try:
+            state_dict = {
+                k.replace("_orig_mod.", ""): v
+                for k, v in checkpoint["model_state_dict"].items()
+            }
+            gru.load_state_dict(state_dict)
+        except Exception:
+            # This is a final model and not a ckpt
+            state_dict = {k.replace("_orig_mod.", ""): v for k, v in checkpoint.items()}
+            gru.load_state_dict(state_dict)
+
+    return gru
