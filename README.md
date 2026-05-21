@@ -30,7 +30,7 @@
 <!-- PROJECT LOGO -->
 <br />
 <div align="center">
-  <a href="https://github.com/grybouilli/GRU-IRR-Filter">
+  <a href="https://github.com/grybouilli/GRU-IIR-Filter">
     <!-- <img src="images/logo.png" alt="Logo" width="80" height="80"> -->
   </a>
 
@@ -39,14 +39,14 @@
   <p align="center">
     A Gated Reccurent Unit that models IIR filters.
     <br />
-    <a href="https://github.com/grybouilli/GRU-IRR-Filter"><strong>Explore the docs »</strong></a>
+    <a href="https://github.com/grybouilli/GRU-IIR-Filter"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://github.com/grybouilli/GRU-IRR-Filter">View Demo</a>
+    <a href="https://github.com/grybouilli/GRU-IIR-Filter">View Demo</a>
     &middot;
-    <a href="https://github.com/grybouilli/GRU-IRR-Filter/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
+    <a href="https://github.com/grybouilli/GRU-IIR-Filter/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
     &middot;
-    <a href="https://github.com/grybouilli/GRU-IRR-Filter/issues/new?labels=enhancement&template=feature-request---.md">Request Feature</a>
+    <a href="https://github.com/grybouilli/GRU-IIR-Filter/issues/new?labels=enhancement&template=feature-request---.md">Request Feature</a>
   </p>
 </div>
 
@@ -297,7 +297,7 @@ Fifth and sixth cells are for testing the model on random white noise and sine s
     - [ ] TF Lite
     - [ ] Executorch
 
-See the [open issues](https://github.com/grybouilli/GRU-IRR-Filter/issues) for a full list of proposed features (and known issues).
+See the [open issues](https://github.com/grybouilli/GRU-IIR-Filter/issues) for a full list of proposed features (and known issues).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -321,8 +321,8 @@ Don't forget to give the project a star! Thanks again!
 
 ### Top contributors:
 
-<a href="https://github.com/grybouilli/GRU-IRR-Filter/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=grybouilli/GRU-IRR-Filter" alt="contrib.rocks image" />
+<a href="https://github.com/grybouilli/GRU-IIR-Filter/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=grybouilli/GRU-IIR-Filter" alt="contrib.rocks image" />
 </a>
 
 
@@ -341,7 +341,7 @@ Distributed under the MIT License. See `LICENSE.txt` for more information.
 
 Nicolas Gry - grybouilli at outlook.fr
 
-Project Link: [https://github.com/grybouilli/GRU-IRR-Filter](https://github.com/grybouilli/GRU-IRR-Filter)
+Project Link: [https://github.com/grybouilli/GRU-IIR-Filter](https://github.com/grybouilli/GRU-IIR-Filter)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -349,16 +349,16 @@ Project Link: [https://github.com/grybouilli/GRU-IRR-Filter](https://github.com/
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
-[contributors-shield]: https://img.shields.io/github/contributors/grybouilli/GRU-IRR-Filter.svg?style=for-the-badge
-[contributors-url]: https://github.com/grybouilli/GRU-IRR-Filter/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/grybouilli/GRU-IRR-Filter.svg?style=for-the-badge
-[forks-url]: https://github.com/grybouilli/GRU-IRR-Filter/network/members
-[stars-shield]: https://img.shields.io/github/stars/grybouilli/GRU-IRR-Filter.svg?style=for-the-badge
-[stars-url]: https://github.com/grybouilli/GRU-IRR-Filter/stargazers
-[issues-shield]: https://img.shields.io/github/issues/grybouilli/GRU-IRR-Filter.svg?style=for-the-badge
-[issues-url]: https://github.com/grybouilli/GRU-IRR-Filter/issues
-[license-shield]: https://img.shields.io/github/license/grybouilli/GRU-IRR-Filter.svg?style=for-the-badge
-[license-url]: https://github.com/grybouilli/GRU-IRR-Filter/blob/master/LICENSE.txt
+[contributors-shield]: https://img.shields.io/github/contributors/grybouilli/GRU-IIR-Filter.svg?style=for-the-badge
+[contributors-url]: https://github.com/grybouilli/GRU-IIR-Filter/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/grybouilli/GRU-IIR-Filter.svg?style=for-the-badge
+[forks-url]: https://github.com/grybouilli/GRU-IIR-Filter/network/members
+[stars-shield]: https://img.shields.io/github/stars/grybouilli/GRU-IIR-Filter.svg?style=for-the-badge
+[stars-url]: https://github.com/grybouilli/GRU-IIR-Filter/stargazers
+[issues-shield]: https://img.shields.io/github/issues/grybouilli/GRU-IIR-Filter.svg?style=for-the-badge
+[issues-url]: https://github.com/grybouilli/GRU-IIR-Filter/issues
+[license-shield]: https://img.shields.io/github/license/grybouilli/GRU-IIR-Filter.svg?style=for-the-badge
+[license-url]: https://github.com/grybouilli/GRU-IIR-Filter/blob/master/LICENSE.txt
 [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
 [linkedin-url]: https://linkedin.com/in/nicolas-gry
 [product-screenshot]: images/screenshot.png
